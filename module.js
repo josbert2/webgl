@@ -13,6 +13,9 @@ export default class Sketch {
   constructor(selector) {
     this.scene = new THREE.Scene();
 
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
+
     this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
@@ -57,30 +60,54 @@ export default class Sketch {
     this.groups = []
     this.handleImages()
   }
+  onClick(event) {
+    event.preventDefault();
+    this.mouse.x = (event.clientX / this.width) * 2 - 1;
+    this.mouse.y = -(event.clientY / this.height) * 2 + 1;
+  
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+  
+    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+  
+    if (intersects.length > 0) {
+      const firstIntersection = intersects[0];
+      console.log("Objeto seleccionado:", firstIntersection.object);
+      // Aquí puedes realizar acciones adicionales con el objeto seleccionado
+    }
+  }
 
-  handleImages(){
+  handleImages() {
     let images = [...document.querySelectorAll('img')]
-    images.forEach((im,i)=>{
+    let loadedImages = 0;
+    images.forEach((im, i) => {
       let mat = this.material.clone()
       this.materials.push(mat)
       let group = new THREE.Group()
-     // mat.wireframe = true
-      mat.uniforms.texture1.value = new THREE.Texture(im);
-      mat.uniforms.texture1.value.needsUpdate = false
+      mat.uniforms.texture1.value = new THREE.Texture(new Image());
+      mat.uniforms.texture1.value.minFilter = THREE.LinearFilter; // solución temporal para evitar errores de textura
+      let textureImage = mat.uniforms.texture1.value.image;
 
+      textureImage.addEventListener('load', () => {
+        mat.uniforms.texture1.value.needsUpdate = true;
+        loadedImages++;
+        if (loadedImages === images.length) {
+          this.imagesLoaded = true;
+          this.addObjects();
+        }
+      });
+      textureImage.src = im.getAttribute('src');
 
-      let geo = new THREE.PlaneBufferGeometry(1.5,1,20,20)
-      let mesh = new THREE.Mesh(geo,mat)
+      let geo = new THREE.PlaneBufferGeometry(1.5, 1, 20, 20)
+      let mesh = new THREE.Mesh(geo, mat)
       group.add(mesh)
       this.groups.push(group)
       this.scene.add(group)
       this.meshes.push(mesh)
       mesh.position.y = i * 1.2
 
-
       group.rotation.y = -0.5;
       group.rotation.x = -0.3;
-      group.rotation.z = -0.1 ;
+      group.rotation.z = -0.1;
     })
   }
 
@@ -95,6 +122,8 @@ export default class Sketch {
 
   setupResize() {
     window.addEventListener("resize", this.resize.bind(this));
+  ;
+
   }
 
   resize() {
@@ -184,6 +213,7 @@ export default class Sketch {
         m.uniforms.time.value = this.time
       })
     }
+    window.addEventListener("click", this.onClick.bind(this))
     
     //this.material.uniforms.time.value = this.time;
     requestAnimationFrame(this.render.bind(this));
